@@ -1,5 +1,12 @@
 var VehicleIV = {};
 
+/*
+Developed by SirCryptic
+Credits to all respectfull authors in the gta modding scene without them this would not be possible
+
+special thanks to Donovan Becker for helping me test
+
+*/
 // Global variables
 var godModeEnabled = false;
 var copsDisabled = false;
