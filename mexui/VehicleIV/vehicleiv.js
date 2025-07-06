@@ -17,13 +17,14 @@ var weaponCheckInterval = null;
 var window = null;
 var isFreeMode = false;
 var spawnProtectionEnabled = false; // Default: off
+var spawnProtectionTimeout = null; // Store timeout for spawn protection
 
 // Function to display on-screen message
 function showMessage(text) {
     try {
         natives.printStringWithLiteralStringNow('STRING', text, 3000, true);
     } catch (e) {
-        console.error('showMessage error: ' + e.message);
+        // Silent error handling
     }
 }
 
@@ -50,16 +51,14 @@ function getPlayerVehicle(attempts, maxAttempts, delay, callback) {
             } else {
                 showMessage('Error: Cannot detect vehicle');
             }
-            console.error('Failed to get player vehicle after ' + maxAttempts + ' attempts');
         } catch (e) {
-            console.error('getPlayerVehicle final check error: ' + e.message);
+            // Silent error handling
         }
         callback(null);
         return;
     }
     try {
         if (!localPlayer) {
-            console.warn('No local player, retrying... Attempt ' + attempts);
             setTimeout(function() {
                 getPlayerVehicle(attempts + 1, maxAttempts, delay, callback);
             }, delay);
@@ -69,19 +68,17 @@ function getPlayerVehicle(attempts, maxAttempts, delay, callback) {
             callback(localPlayer.vehicle);
             return;
         }
-        console.warn('Vehicle not detected, retrying... Attempt ' + attempts);
         setTimeout(function() {
             getPlayerVehicle(attempts + 1, maxAttempts, delay, callback);
         }, delay);
     } catch (e) {
-        console.error('getPlayerVehicle error: ' + e.message);
         setTimeout(function() {
             getPlayerVehicle(attempts + 1, maxAttempts, delay, callback);
         }, delay);
     }
 }
 
-// Function to create vehicle with model validation/loading
+// Function to create vehicle with model validation/loading and enhanced spawn protection
 function createVehicle2(hash, position, sync) {
     try {
         if (natives.isModelInCdimage(hash)) {
@@ -92,21 +89,36 @@ function createVehicle2(hash, position, sync) {
                 // Apply spawn protection if enabled
                 if (spawnProtectionEnabled) {
                     try {
+                        // Make vehicle invulnerable
                         natives.setCarCanBeDamaged(vehicle, false);
-                        console.log('Vehicle spawn protection enabled for vehicle');
-                        setTimeout(function() {
+                        showMessage('Spawn protection enabled for 10 seconds');
+
+                        // Clear any existing timeout to prevent overlap
+                        if (spawnProtectionTimeout) {
+                            clearTimeout(spawnProtectionTimeout);
+                            spawnProtectionTimeout = null;
+                        }
+
+                        // Set timeout to remove spawn protection after 10 seconds
+                        spawnProtectionTimeout = setTimeout(function() {
                             try {
                                 if (natives.doesVehicleExist(vehicle)) {
+                                    // Revert to god mode state or make vulnerable
                                     natives.setCarCanBeDamaged(vehicle, !godModeEnabled);
-                                    console.log('Vehicle spawn protection expired for vehicle');
+                                    showMessage('Spawn protection expired');
                                 }
                             } catch (e) {
-                                console.error('Vehicle spawn protection expiration error: ' + e.message);
+                                // Silent error handling
+                            } finally {
+                                spawnProtectionTimeout = null;
                             }
                         }, 10000); // 10 seconds
                     } catch (e) {
-                        console.error('Vehicle spawn protection error: ' + e.message);
+                        showMessage('Spawn protection error: ' + e.message);
                     }
+                } else if (godModeEnabled) {
+                    // Apply god mode immediately if enabled and no spawn protection
+                    natives.setCarCanBeDamaged(vehicle, false);
                 }
                 return vehicle;
             } else {
@@ -127,12 +139,10 @@ VehicleIV.init = function() {
     // Check if mexui is available with retry mechanism
     function tryInit(attempts, maxAttempts, delay) {
         if (attempts > maxAttempts) {
-            console.error('mexui failed to load after ' + maxAttempts + ' attempts.');
             showMessage('Error: mexui resource failed to load!');
             return;
         }
         if (typeof mexui === 'undefined' || !mexui) {
-            console.warn('mexui not available, retrying... Attempt ' + attempts);
             setTimeout(function() {
                 tryInit(attempts + 1, maxAttempts, delay);
             }, delay);
@@ -140,7 +150,6 @@ VehicleIV.init = function() {
         }
 
         if (typeof toColour === 'undefined') {
-            console.error('toColour function is undefined');
             showMessage('Error: toColour function missing');
             return;
         }
@@ -159,12 +168,10 @@ VehicleIV.init = function() {
         function setupUI(freeMode) {
             // Create new window
             try {
-                window = mexui.window(500, 200, 400, 380, 'Vehicle Spawner', styles);
+                window = mexui.window(500, 200, 400, 400, 'Vehicle Spawner', styles);
                 window.setShown(false);
                 window.center();
-                console.log('Applying window background: mexui default');
             } catch (e) {
-                console.error('Failed to create window: ' + e.message);
                 showMessage('Error creating vehicle spawner menu');
                 return;
             }
@@ -172,10 +179,9 @@ VehicleIV.init = function() {
             if (!freeMode) {
                 try {
                     window.text(10, 260, 380, 20, 'Vehicle Spawner Disabled', { align: 'center', textColour: toColour(255, 0, 0, 255) });
-                    window.text(10, 335, 380, 20, 'Developed by SirCryptic aka WizzWow :)', { align: 'center', textColour: toColour(255, 255, 255, 255) });
+                    window.text(10, 360, 380, 20, 'Developed by SirCryptic aka WizzWow :)', { align: 'center', textColour: toColour(255, 255, 255, 255) });
                     showMessage('Vehicle Spawner disabled: Not in Free Mode');
                 } catch (e) {
-                    console.error('Failed to set disabled message: ' + e.message);
                     showMessage('Error disabling spawner');
                 }
                 return; // Skip creating interactive elements
@@ -231,7 +237,7 @@ VehicleIV.init = function() {
                 { name: 'Manana', display: 'Manana', id: -2124201592 },
                 { name: 'Marbella', display: 'Marbella', id: 1304597482 },
                 { name: 'Merit', display: 'Merit', id: -1260881538 },
-                { name: 'Minivan', display: 'Minivan', id: -310465116 },
+                { name: 'MinivanAuthentic', display: 'Minivan', id: -310465116 },
                 { name: 'Moonbeam', display: 'Moonbeam', id: 525509695 },
                 { name: 'MrTasty', display: 'Mr. Tasty', id: 583100975 },
                 { name: 'Mule', display: 'Mule', id: 904750859 },
@@ -278,11 +284,11 @@ VehicleIV.init = function() {
                 { name: 'Taxi', display: 'Taxi', id: -956048545 },
                 { name: 'Taxi2', display: 'Taxi 2', id: 1208856469 },
                 { name: 'Trashmaster', display: 'Trashmaster', id: 1917016601 },
-                { name: 'Turismo', display: 'Tur Turismo', id: -1896659641 },
+                { name: 'Turismo', display: 'Turismo', id: -1896659641 },
                 { name: 'Uranus', display: 'Uranus', id: 1534326199 },
                 { name: 'Vigero', display: 'Vigero', id: -825837129 },
                 { name: 'Vigero2', display: 'Vigero 2', id: -1758379524 },
-                { name: 'aiman', display: 'Vincent', id: -583281407 },
+                { name: 'Vincent', display: 'Vincent', id: -583281407 },
                 { name: 'Virgo', display: 'Virgo', id: -498054846 },
                 { name: 'Voodoo', display: 'Voodoo', id: 2006667053 },
                 { name: 'Washington', display: 'Washington', id: 1777363799 },
@@ -342,8 +348,12 @@ VehicleIV.init = function() {
                         if (lastSpawnedVehicle) {
                             try {
                                 destroyElement(lastSpawnedVehicle);
+                                if (spawnProtectionTimeout) {
+                                    clearTimeout(spawnProtectionTimeout);
+                                    spawnProtectionTimeout = null;
+                                }
                             } catch (e) {
-                                showMessage('Error deleting previous vehicle: ' + e.message);
+                                showMessage('Error deleting previous vehicle');
                             }
                             lastSpawnedVehicle = null;
                         }
@@ -361,25 +371,20 @@ VehicleIV.init = function() {
                                     // Check if the vehicle is drivable before warping
                                     if (natives.isThisModelACar(model.id) || natives.isThisModelABike(model.id) || natives.isThisModelAHeli(model.id) || natives.isThisModelABoat(model.id)) {
                                         natives.warpCharIntoCar(localPlayer, vehicle);
-                                        showMessage('Spawned: ' + model.display + ' and warped player');
+                                        showMessage('Spawned: ' + model.display + ' and warped player' + (spawnProtectionEnabled ? ' with spawn protection' : ''));
                                     } else {
-                                        showMessage('Spawned: ' + model.display + ' (non-drivable vehicle)');
-                                    }
-                                    if (godModeEnabled) {
-                                        natives.setCarCanBeDamaged(vehicle, false);
+                                        showMessage('Spawned: ' + model.display + ' (non-drivable vehicle)' + (spawnProtectionEnabled ? ' with spawn protection' : ''));
                                     }
                                     lastSpawnedVehicle = vehicle;
-                                } else {
-                                    showMessage('Failed to spawn: ' + model.display);
                                 }
                             } catch (e) {
-                                showMessage('Failed to spawn ' + model.display + ': ' + e.message);
+                                showMessage('Failed to spawn ' + model.display);
                             } finally {
                                 isSpawning = false;
                             }
                         }, 500); // 500ms delay
                     } catch (e) {
-                        showMessage('Failed to spawn ' + model.display + ': ' + e.message);
+                        showMessage('Failed to spawn ' + model.display);
                         isSpawning = false;
                     }
                 });
@@ -387,7 +392,7 @@ VehicleIV.init = function() {
                     vehicleDropdown.item(vehicleModels[i].display);
                 }
             } catch (e) {
-                console.error('Failed to create vehicle dropdown: ' + e.message);
+                showMessage('Error creating vehicle dropdown');
             }
 
             // Repair button
@@ -401,13 +406,12 @@ VehicleIV.init = function() {
                             natives.fixCar(vehicle);
                             showMessage('Vehicle repaired');
                         } catch (e) {
-                            console.error('Repair error: ' + e.message);
                             showMessage('Repair error: ' + e.message);
                         }
                     });
                 });
             } catch (e) {
-                console.error('Failed to create Repair button: ' + e.message);
+                showMessage('Error creating Repair button');
             }
 
             // Vehicle Flip button
@@ -419,26 +423,22 @@ VehicleIV.init = function() {
                         }
                         try {
                             var useNative = typeof natives.setCarOnGroundProperly !== 'undefined';
-                            console.log('setCarOnGroundProperly available: ' + useNative);
                             if (useNative) {
                                 natives.setCarOnGroundProperly(vehicle);
-                                console.log('Flipped vehicle using setCarOnGroundProperly');
                             } else {
                                 // Fallback: Reset heading and adjust z-coordinate
                                 var pos = vehicle.position;
                                 natives.setCarHeading(vehicle, vehicle.heading);
                                 natives.setCarCoordinates(vehicle, pos.x, pos.y, pos.z + 0.5);
-                                console.log('Flipped vehicle using fallback method');
                             }
                             showMessage('Vehicle flipped');
                         } catch (e) {
-                            console.error('Flip error: ' + e.message);
                             showMessage('Flip error: ' + e.message);
                         }
                     });
                 });
             } catch (e) {
-                console.error('Failed to create Flip Vehicle button: ' + e.message);
+                showMessage('Error creating Flip Vehicle button');
             }
 
             // Delete button
@@ -451,17 +451,20 @@ VehicleIV.init = function() {
                         try {
                             destroyElement(vehicle);
                             if (vehicle === lastSpawnedVehicle) {
+                                if (spawnProtectionTimeout) {
+                                    clearTimeout(spawnProtectionTimeout);
+                                    spawnProtectionTimeout = null;
+                                }
                                 lastSpawnedVehicle = null;
                             }
                             showMessage('Vehicle deleted');
                         } catch (e) {
-                            console.error('Delete error: ' + e.message);
                             showMessage('Delete error: ' + e.message);
                         }
                     });
                 });
             } catch (e) {
-                console.error('Failed to create Delete button: ' + e.message);
+                showMessage('Error creating Delete button');
             }
 
             // Dirt level dropdown
@@ -476,7 +479,6 @@ VehicleIV.init = function() {
                             natives.setVehicleDirtLevel(vehicle, selectedIndex);
                             showMessage('Dirt level set to ' + selectedIndex);
                         } catch (e) {
-                            console.error('Dirt level error: ' + e.message);
                             showMessage('Dirt level error: ' + e.message);
                         }
                     });
@@ -485,7 +487,7 @@ VehicleIV.init = function() {
                     dirtLevelDropdown.item('Level ' + i);
                 }
             } catch (e) {
-                console.error('Failed to create Dirt Level dropdown: ' + e.message);
+                showMessage('Error creating Dirt Level dropdown');
             }
 
             // Livery dropdown
@@ -500,7 +502,6 @@ VehicleIV.init = function() {
                             natives.setCarLivery(vehicle, selectedIndex);
                             showMessage('Livery set to ' + selectedIndex);
                         } catch (e) {
-                            console.error('Livery error: ' + e.message);
                             showMessage('Livery error: ' + e.message);
                         }
                     });
@@ -509,7 +510,7 @@ VehicleIV.init = function() {
                     liveryDropdown.item('Livery ' + i);
                 }
             } catch (e) {
-                console.error('Failed to create Livery dropdown: ' + e.message);
+                showMessage('Error creating Livery dropdown');
             }
 
             // Color dropdowns
@@ -532,7 +533,6 @@ VehicleIV.init = function() {
                                     vehicle[colorType.property] = selectedIndex;
                                     showMessage(colorType.name + ' color set to ' + selectedIndex);
                                 } catch (e) {
-                                    console.error(colorType.name + ' color error: ' + e.message);
                                     showMessage(colorType.name + ' color error: ' + e.message);
                                 }
                             });
@@ -541,7 +541,7 @@ VehicleIV.init = function() {
                             dropdown.item('Color ' + j);
                         }
                     } catch (e) {
-                        console.error('Failed to create ' + colorType.name + ' Color dropdown: ' + e.message);
+                        showMessage('Error creating ' + colorType.name + ' Color dropdown');
                     }
                 })(colorTypes[i]);
             }
@@ -550,43 +550,40 @@ VehicleIV.init = function() {
             try {
                 var godModeCheckbox = window.checkBox(10, 180, 20, 20, '', {}, function() {
                     godModeEnabled = this.checked;
-                    console.log('Vehicle God Mode toggled to: ' + godModeEnabled);
                     getPlayerVehicle(1, 5, 200, function(vehicle) {
                         if (vehicle) {
                             try {
                                 natives.setCarCanBeDamaged(vehicle, !godModeEnabled);
+                                showMessage('Vehicle God Mode ' + (godModeEnabled ? 'enabled' : 'disabled'));
                             } catch (e) {
-                                console.error('Vehicle God Mode error: ' + e.message);
+                                showMessage('Vehicle God Mode error: ' + e.message);
                             }
+                        } else {
+                            showMessage('Vehicle God Mode ' + (godModeEnabled ? 'enabled' : 'disabled'));
                         }
-                        showMessage('Vehicle God Mode ' + (godModeEnabled ? 'enabled' : 'disabled'));
                     });
                 });
                 godModeCheckbox.checked = godModeEnabled;
-                console.log('Vehicle God Mode checkbox initialized to: ' + godModeEnabled);
                 window.text(40, 180, 150, 20, 'Vehicle God Mode', {});
             } catch (e) {
-                console.error('Failed to create Vehicle God Mode checkbox or label: ' + e.message);
+                showMessage('Error creating Vehicle God Mode checkbox');
             }
 
             // Disable Cops checkbox
             try {
                 var copsCheckbox = window.checkBox(10, 210, 20, 20, '', {}, function() {
                     copsDisabled = this.checked;
-                    console.log('Disable Cops toggled to: ' + copsDisabled);
                     try {
                         natives.setMaxWantedLevel(copsDisabled ? 0 : 6);
                         showMessage('Cops ' + (copsDisabled ? 'disabled' : 'enabled'));
                     } catch (e) {
-                        console.error('Cops toggle error: ' + e.message);
                         showMessage('Cops toggle error: ' + e.message);
                     }
                 });
                 copsCheckbox.checked = copsDisabled;
-                console.log('Disable Cops checkbox initialized to: ' + copsDisabled);
                 window.text(40, 210, 150, 20, 'Disable Cops', {});
             } catch (e) {
-                console.error('Failed to create Disable Cops checkbox or label: ' + e.message);
+                showMessage('Error creating Disable Cops checkbox');
             }
 
             // Player God Mode checkbox
@@ -597,39 +594,34 @@ VehicleIV.init = function() {
                         return;
                     }
                     playerGodModeEnabled = this.checked;
-                    console.log('Player God Mode toggled to: ' + playerGodModeEnabled);
                     try {
                         natives.setCharInvincible(localPlayer, playerGodModeEnabled);
                         showMessage('Player God Mode ' + (playerGodModeEnabled ? 'enabled' : 'disabled'));
                     } catch (e) {
-                        console.error('Player God Mode error: ' + e.message);
                         showMessage('Player God Mode error: ' + e.message);
                     }
                 });
                 playerGodModeCheckbox.checked = playerGodModeEnabled;
-                console.log('Player God Mode checkbox initialized to: ' + playerGodModeEnabled);
                 window.text(40, 240, 150, 20, 'Player God Mode', {});
             } catch (e) {
-                console.error('Failed to create Player God Mode checkbox or label: ' + e.message);
+                showMessage('Error creating Player God Mode checkbox');
             }
 
             // Vehicle Spawn Protection checkbox
             try {
                 var spawnProtectionCheckbox = window.checkBox(10, 270, 20, 20, '', {}, function() {
                     spawnProtectionEnabled = this.checked;
-                    console.log('Vehicle Spawn Protection toggled to: ' + spawnProtectionEnabled);
                     showMessage('Vehicle Spawn Protection ' + (spawnProtectionEnabled ? 'enabled' : 'disabled'));
                 });
                 spawnProtectionCheckbox.checked = spawnProtectionEnabled;
-                console.log('Vehicle Spawn Protection checkbox initialized to: ' + spawnProtectionEnabled);
                 window.text(40, 270, 150, 20, 'Vehicle Spawn Protection', {});
             } catch (e) {
-                console.error('Failed to create Vehicle Spawn Protection checkbox or label: ' + e.message);
+                showMessage('Error creating Vehicle Spawn Protection checkbox');
             }
 
             // Teleport to Waypoint button
             try {
-                var teleportButton = window.button(10, 300, 185, 25, 'Teleport to Waypoint', {}, function() {
+                var teleportButton = window.button(10, 330, 185, 25, 'Teleport to Waypoint', {}, function() {
                     try {
                         var blipId = natives.getFirstBlipInfoId(8); // 8 is waypoint blip type
                         if (blipId) {
@@ -649,19 +641,18 @@ VehicleIV.init = function() {
                             showMessage('No waypoint set');
                         }
                     } catch (e) {
-                        console.error('Teleport error: ' + e.message);
                         showMessage('Teleport error: ' + e.message);
                     }
                 });
             } catch (e) {
-                console.error('Failed to create Teleport button: ' + e.message);
+                showMessage('Error creating Teleport button');
             }
 
             // Footer text
             try {
-                window.text(10, 335, 380, 20, 'Developed by SirCryptic aka WizzWow :)', { align: 'center', textColour: toColour(255, 255, 255, 255) });
+                window.text(10, 360, 380, 20, 'Developed by SirCryptic aka WizzWow :)', { align: 'center', textColour: toColour(255, 255, 255, 255) });
             } catch (e) {
-                console.error('Failed to create footer text: ' + e.message);
+                showMessage('Error creating footer text');
             }
         }
 
@@ -683,11 +674,12 @@ VehicleIV.init = function() {
                 }
             });
         } catch (e) {
-            console.error('Failed to bind F3 key: ' + e.message);
+            showMessage('Error binding F3 key');
         }
 
         // Constant check for weapon state and vehicle god mode
         weaponCheckInterval = setInterval(function() {
+            // Player God Mode: Remove weapons and pickups
             if (playerGodModeEnabled && localPlayer) {
                 try {
                     natives.removeAllCharWeapons(localPlayer);
@@ -696,14 +688,16 @@ VehicleIV.init = function() {
                         natives.removeAllPickupsOfType(weaponTypes[i]);
                     }
                 } catch (e) {
-                    console.error('Weapon/pickup check error: ' + e.message);
+                    // Silent error handling
                 }
             }
+
+            // Vehicle God Mode: Make vehicle invincible
             if (godModeEnabled && localPlayer.vehicle) {
                 try {
                     natives.setCarCanBeDamaged(localPlayer.vehicle, false);
                 } catch (e) {
-                    console.error('Vehicle God Mode check error: ' + e.message);
+                    // Silent error handling
                 }
             }
         }, 100); // Check every 100ms
@@ -724,7 +718,6 @@ VehicleIV.init = function() {
                 throw new Error('gta.ivGamemode is not defined');
             }
         } catch (e) {
-            console.error('Failed to check Free Mode: ' + e.message);
             showMessage('Game mode check failed, assuming non-Free Mode');
             showMessage('Vehicle Menu Disabled');
             isFreeMode = false;
