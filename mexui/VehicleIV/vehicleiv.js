@@ -550,6 +550,7 @@ VehicleIV.init = function() {
             try {
                 var godModeCheckbox = window.checkBox(10, 180, 20, 20, '', {}, function() {
                     godModeEnabled = this.checked;
+                    console.log('Vehicle God Mode toggled to: ' + godModeEnabled);
                     getPlayerVehicle(1, 5, 200, function(vehicle) {
                         if (vehicle) {
                             try {
@@ -561,6 +562,8 @@ VehicleIV.init = function() {
                         showMessage('Vehicle God Mode ' + (godModeEnabled ? 'enabled' : 'disabled'));
                     });
                 });
+                godModeCheckbox.checked = godModeEnabled;
+                console.log('Vehicle God Mode checkbox initialized to: ' + godModeEnabled);
                 window.text(40, 180, 150, 20, 'Vehicle God Mode', {});
             } catch (e) {
                 console.error('Failed to create Vehicle God Mode checkbox or label: ' + e.message);
@@ -570,6 +573,7 @@ VehicleIV.init = function() {
             try {
                 var copsCheckbox = window.checkBox(10, 210, 20, 20, '', {}, function() {
                     copsDisabled = this.checked;
+                    console.log('Disable Cops toggled to: ' + copsDisabled);
                     try {
                         natives.setMaxWantedLevel(copsDisabled ? 0 : 6);
                         showMessage('Cops ' + (copsDisabled ? 'disabled' : 'enabled'));
@@ -578,6 +582,8 @@ VehicleIV.init = function() {
                         showMessage('Cops toggle error: ' + e.message);
                     }
                 });
+                copsCheckbox.checked = copsDisabled;
+                console.log('Disable Cops checkbox initialized to: ' + copsDisabled);
                 window.text(40, 210, 150, 20, 'Disable Cops', {});
             } catch (e) {
                 console.error('Failed to create Disable Cops checkbox or label: ' + e.message);
@@ -591,6 +597,7 @@ VehicleIV.init = function() {
                         return;
                     }
                     playerGodModeEnabled = this.checked;
+                    console.log('Player God Mode toggled to: ' + playerGodModeEnabled);
                     try {
                         natives.setCharInvincible(localPlayer, playerGodModeEnabled);
                         showMessage('Player God Mode ' + (playerGodModeEnabled ? 'enabled' : 'disabled'));
@@ -599,6 +606,8 @@ VehicleIV.init = function() {
                         showMessage('Player God Mode error: ' + e.message);
                     }
                 });
+                playerGodModeCheckbox.checked = playerGodModeEnabled;
+                console.log('Player God Mode checkbox initialized to: ' + playerGodModeEnabled);
                 window.text(40, 240, 150, 20, 'Player God Mode', {});
             } catch (e) {
                 console.error('Failed to create Player God Mode checkbox or label: ' + e.message);
@@ -608,8 +617,11 @@ VehicleIV.init = function() {
             try {
                 var spawnProtectionCheckbox = window.checkBox(10, 270, 20, 20, '', {}, function() {
                     spawnProtectionEnabled = this.checked;
+                    console.log('Vehicle Spawn Protection toggled to: ' + spawnProtectionEnabled);
                     showMessage('Vehicle Spawn Protection ' + (spawnProtectionEnabled ? 'enabled' : 'disabled'));
                 });
+                spawnProtectionCheckbox.checked = spawnProtectionEnabled;
+                console.log('Vehicle Spawn Protection checkbox initialized to: ' + spawnProtectionEnabled);
                 window.text(40, 270, 150, 20, 'Vehicle Spawn Protection', {});
             } catch (e) {
                 console.error('Failed to create Vehicle Spawn Protection checkbox or label: ' + e.message);
