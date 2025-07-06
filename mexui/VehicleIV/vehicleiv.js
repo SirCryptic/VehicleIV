@@ -16,11 +16,12 @@ var isSpawning = false;
 var weaponCheckInterval = null;
 var window = null;
 var isFreeMode = false;
+var spawnProtectionEnabled = false; // Default: off
 
 // Function to display on-screen message
 function showMessage(text) {
     try {
-        natives.printStringWithLiteralStringNow('STRING', text, 3000, true); // Display for 3 seconds
+        natives.printStringWithLiteralStringNow('STRING', text, 3000, true);
     } catch (e) {
         console.error('showMessage error: ' + e.message);
     }
@@ -40,13 +41,78 @@ function getPosInFrontOfPos(pos, heading, distance) {
     }
 }
 
+// Function to get player vehicle with retry
+function getPlayerVehicle(attempts, maxAttempts, delay, callback) {
+    if (attempts > maxAttempts) {
+        try {
+            if (localPlayer && !natives.isCharInAnyCar(localPlayer)) {
+                showMessage('Not in a vehicle');
+            } else {
+                showMessage('Error: Cannot detect vehicle');
+            }
+            console.error('Failed to get player vehicle after ' + maxAttempts + ' attempts');
+        } catch (e) {
+            console.error('getPlayerVehicle final check error: ' + e.message);
+        }
+        callback(null);
+        return;
+    }
+    try {
+        if (!localPlayer) {
+            console.warn('No local player, retrying... Attempt ' + attempts);
+            setTimeout(function() {
+                getPlayerVehicle(attempts + 1, maxAttempts, delay, callback);
+            }, delay);
+            return;
+        }
+        if (localPlayer.vehicle && natives.doesVehicleExist(localPlayer.vehicle) && natives.isCharInAnyCar(localPlayer)) {
+            callback(localPlayer.vehicle);
+            return;
+        }
+        console.warn('Vehicle not detected, retrying... Attempt ' + attempts);
+        setTimeout(function() {
+            getPlayerVehicle(attempts + 1, maxAttempts, delay, callback);
+        }, delay);
+    } catch (e) {
+        console.error('getPlayerVehicle error: ' + e.message);
+        setTimeout(function() {
+            getPlayerVehicle(attempts + 1, maxAttempts, delay, callback);
+        }, delay);
+    }
+}
+
 // Function to create vehicle with model validation/loading
 function createVehicle2(hash, position, sync) {
     try {
         if (natives.isModelInCdimage(hash)) {
             natives.requestModel(hash);
             natives.loadAllObjectsNow();
-            return natives.createCar(hash, position, sync);
+            var vehicle = natives.createCar(hash, position, sync);
+            if (vehicle) {
+                // Apply spawn protection if enabled
+                if (spawnProtectionEnabled) {
+                    try {
+                        natives.setCarCanBeDamaged(vehicle, false);
+                        console.log('Vehicle spawn protection enabled for vehicle');
+                        setTimeout(function() {
+                            try {
+                                if (natives.doesVehicleExist(vehicle)) {
+                                    natives.setCarCanBeDamaged(vehicle, !godModeEnabled);
+                                    console.log('Vehicle spawn protection expired for vehicle');
+                                }
+                            } catch (e) {
+                                console.error('Vehicle spawn protection expiration error: ' + e.message);
+                            }
+                        }, 10000); // 10 seconds
+                    } catch (e) {
+                        console.error('Vehicle spawn protection error: ' + e.message);
+                    }
+                }
+                return vehicle;
+            } else {
+                showMessage('Model ' + hash + ' failed to spawn');
+                return null;
+            }
         } else {
             showMessage('Model ' + hash + ' is not in CD image!');
             return null;
@@ -105,8 +171,8 @@ VehicleIV.init = function() {
 
             if (!freeMode) {
                 try {
-                    window.text(10, 350, 380, 20, 'Vehicle Spawner Disabled', { align: 'center', textColour: toColour(255, 0, 0, 255) });
-                    window.text(10, 300, 380, 20, 'Developed by SirCryptic aka WizzWow :)', { align: 'center', textColour: toColour(255, 255, 255, 255) });
+                    window.text(10, 260, 380, 20, 'Vehicle Spawner Disabled', { align: 'center', textColour: toColour(255, 0, 0, 255) });
+                    window.text(10, 335, 380, 20, 'Developed by SirCryptic aka WizzWow :)', { align: 'center', textColour: toColour(255, 255, 255, 255) });
                     showMessage('Vehicle Spawner disabled: Not in Free Mode');
                 } catch (e) {
                     console.error('Failed to set disabled message: ' + e.message);
@@ -133,7 +199,7 @@ VehicleIV.init = function() {
                 { name: 'Cabby', display: 'Cabby', id: 1884962369 },
                 { name: 'Cavalcade', display: 'Cavalcade', id: 2006918058 },
                 { name: 'Chavos', display: 'Chavos', id: -67282078 },
-                { name: 'Cognoscenti', display: 'Cognoscenti', id: -2030171296 },
+                { name: 'Cognoscenti', display: 'Cognoscenti', id: -30171296 },
                 { name: 'Comet', display: 'Comet', id: 1063483177 },
                 { name: 'Coquette', display: 'Coquette', id: 108773431 },
                 { name: 'DF8', display: 'DF8', id: 162883121 },
@@ -216,7 +282,7 @@ VehicleIV.init = function() {
                 { name: 'Uranus', display: 'Uranus', id: 1534326199 },
                 { name: 'Vigero', display: 'Vigero', id: -825837129 },
                 { name: 'Vigero2', display: 'Vigero 2', id: -1758379524 },
-                { name: 'Vincent', display: 'Vincent', id: -583281407 },
+                { name: 'aiman', display: 'Vincent', id: -583281407 },
                 { name: 'Virgo', display: 'Virgo', id: -498054846 },
                 { name: 'Voodoo', display: 'Voodoo', id: 2006667053 },
                 { name: 'Washington', display: 'Washington', id: 1777363799 },
@@ -327,37 +393,72 @@ VehicleIV.init = function() {
             // Repair button
             try {
                 var repairButton = window.button(10, 60, 120, 25, 'Repair', {}, function() {
-                    if (localPlayer.vehicle) {
+                    getPlayerVehicle(1, 5, 200, function(vehicle) {
+                        if (!vehicle) {
+                            return; // Message handled in getPlayerVehicle
+                        }
                         try {
-                            natives.fixCar(localPlayer.vehicle);
+                            natives.fixCar(vehicle);
                             showMessage('Vehicle repaired');
                         } catch (e) {
+                            console.error('Repair error: ' + e.message);
                             showMessage('Repair error: ' + e.message);
                         }
-                    } else {
-                        showMessage('Enter a vehicle to repair');
-                    }
+                    });
                 });
             } catch (e) {
                 console.error('Failed to create Repair button: ' + e.message);
             }
 
+            // Vehicle Flip button
+            try {
+                var flipButton = window.button(140, 60, 120, 25, 'Flip Vehicle', {}, function() {
+                    getPlayerVehicle(1, 5, 200, function(vehicle) {
+                        if (!vehicle) {
+                            return; // Message handled in getPlayerVehicle
+                        }
+                        try {
+                            var useNative = typeof natives.setCarOnGroundProperly !== 'undefined';
+                            console.log('setCarOnGroundProperly available: ' + useNative);
+                            if (useNative) {
+                                natives.setCarOnGroundProperly(vehicle);
+                                console.log('Flipped vehicle using setCarOnGroundProperly');
+                            } else {
+                                // Fallback: Reset heading and adjust z-coordinate
+                                var pos = vehicle.position;
+                                natives.setCarHeading(vehicle, vehicle.heading);
+                                natives.setCarCoordinates(vehicle, pos.x, pos.y, pos.z + 0.5);
+                                console.log('Flipped vehicle using fallback method');
+                            }
+                            showMessage('Vehicle flipped');
+                        } catch (e) {
+                            console.error('Flip error: ' + e.message);
+                            showMessage('Flip error: ' + e.message);
+                        }
+                    });
+                });
+            } catch (e) {
+                console.error('Failed to create Flip Vehicle button: ' + e.message);
+            }
+
             // Delete button
             try {
-                var deleteButton = window.button(250, 60, 120, 25, 'Delete', {}, function() {
-                    if (localPlayer.vehicle) {
+                var deleteButton = window.button(270, 60, 120, 25, 'Delete', {}, function() {
+                    getPlayerVehicle(1, 5, 200, function(vehicle) {
+                        if (!vehicle) {
+                            return; // Message handled in getPlayerVehicle
+                        }
                         try {
-                            destroyElement(localPlayer.vehicle);
-                            if (localPlayer.vehicle === lastSpawnedVehicle) {
+                            destroyElement(vehicle);
+                            if (vehicle === lastSpawnedVehicle) {
                                 lastSpawnedVehicle = null;
                             }
                             showMessage('Vehicle deleted');
                         } catch (e) {
+                            console.error('Delete error: ' + e.message);
                             showMessage('Delete error: ' + e.message);
                         }
-                    } else {
-                        showMessage('Enter a vehicle to delete');
-                    }
+                    });
                 });
             } catch (e) {
                 console.error('Failed to create Delete button: ' + e.message);
@@ -367,16 +468,18 @@ VehicleIV.init = function() {
             try {
                 var dirtLevelDropdown = window.dropDown(10, 90, 185, 25, 'Dirt Level', {}, function() {
                     var selectedIndex = this.selectedEntryIndex;
-                    if (!localPlayer.vehicle) {
-                        showMessage('Enter a vehicle for dirt level');
-                        return;
-                    }
-                    try {
-                        natives.setVehicleDirtLevel(localPlayer.vehicle, selectedIndex);
-                        showMessage('Dirt level set to ' + selectedIndex);
-                    } catch (e) {
-                        showMessage('Dirt level error: ' + e.message);
-                    }
+                    getPlayerVehicle(1, 5, 200, function(vehicle) {
+                        if (!vehicle) {
+                            return; // Message handled in getPlayerVehicle
+                        }
+                        try {
+                            natives.setVehicleDirtLevel(vehicle, selectedIndex);
+                            showMessage('Dirt level set to ' + selectedIndex);
+                        } catch (e) {
+                            console.error('Dirt level error: ' + e.message);
+                            showMessage('Dirt level error: ' + e.message);
+                        }
+                    });
                 });
                 for (var i = 0; i <= 10; i++) {
                     dirtLevelDropdown.item('Level ' + i);
@@ -389,16 +492,18 @@ VehicleIV.init = function() {
             try {
                 var liveryDropdown = window.dropDown(205, 90, 185, 25, 'Livery', {}, function() {
                     var selectedIndex = this.selectedEntryIndex;
-                    if (!localPlayer.vehicle) {
-                        showMessage('Enter a vehicle for livery');
-                        return;
-                    }
-                    try {
-                        natives.setCarLivery(localPlayer.vehicle, selectedIndex);
-                        showMessage('Livery set to ' + selectedIndex);
-                    } catch (e) {
-                        showMessage('Livery error: ' + e.message);
-                    }
+                    getPlayerVehicle(1, 5, 200, function(vehicle) {
+                        if (!vehicle) {
+                            return; // Message handled in getPlayerVehicle
+                        }
+                        try {
+                            natives.setCarLivery(vehicle, selectedIndex);
+                            showMessage('Livery set to ' + selectedIndex);
+                        } catch (e) {
+                            console.error('Livery error: ' + e.message);
+                            showMessage('Livery error: ' + e.message);
+                        }
+                    });
                 });
                 for (var i = 0; i <= 10; i++) {
                     liveryDropdown.item('Livery ' + i);
@@ -419,16 +524,18 @@ VehicleIV.init = function() {
                     try {
                         var dropdown = window.dropDown(colorType.x, colorType.y, 185, 25, colorType.name + ' Color', {}, function() {
                             var selectedIndex = this.selectedEntryIndex;
-                            if (!localPlayer.vehicle) {
-                                showMessage('Enter a vehicle to change color');
-                                return;
-                            }
-                            try {
-                                localPlayer.vehicle[colorType.property] = selectedIndex;
-                                showMessage(colorType.name + ' color set to ' + selectedIndex);
-                            } catch (e) {
-                                showMessage(colorType.name + ' color error: ' + e.message);
-                            }
+                            getPlayerVehicle(1, 5, 200, function(vehicle) {
+                                if (!vehicle) {
+                                    return; // Message handled in getPlayerVehicle
+                                }
+                                try {
+                                    vehicle[colorType.property] = selectedIndex;
+                                    showMessage(colorType.name + ' color set to ' + selectedIndex);
+                                } catch (e) {
+                                    console.error(colorType.name + ' color error: ' + e.message);
+                                    showMessage(colorType.name + ' color error: ' + e.message);
+                                }
+                            });
                         });
                         for (var j = 0; j <= 10; j++) {
                             dropdown.item('Color ' + j);
@@ -443,14 +550,16 @@ VehicleIV.init = function() {
             try {
                 var godModeCheckbox = window.checkBox(10, 180, 20, 20, '', {}, function() {
                     godModeEnabled = this.checked;
-                    try {
-                        if (localPlayer.vehicle) {
-                            natives.setCarCanBeDamaged(localPlayer.vehicle, !godModeEnabled);
+                    getPlayerVehicle(1, 5, 200, function(vehicle) {
+                        if (vehicle) {
+                            try {
+                                natives.setCarCanBeDamaged(vehicle, !godModeEnabled);
+                            } catch (e) {
+                                console.error('Vehicle God Mode error: ' + e.message);
+                            }
                         }
                         showMessage('Vehicle God Mode ' + (godModeEnabled ? 'enabled' : 'disabled'));
-                    } catch (e) {
-                        showMessage('Vehicle God Mode error: ' + e.message);
-                    }
+                    });
                 });
                 window.text(40, 180, 150, 20, 'Vehicle God Mode', {});
             } catch (e) {
@@ -465,6 +574,7 @@ VehicleIV.init = function() {
                         natives.setMaxWantedLevel(copsDisabled ? 0 : 6);
                         showMessage('Cops ' + (copsDisabled ? 'disabled' : 'enabled'));
                     } catch (e) {
+                        console.error('Cops toggle error: ' + e.message);
                         showMessage('Cops toggle error: ' + e.message);
                     }
                 });
@@ -485,6 +595,7 @@ VehicleIV.init = function() {
                         natives.setCharInvincible(localPlayer, playerGodModeEnabled);
                         showMessage('Player God Mode ' + (playerGodModeEnabled ? 'enabled' : 'disabled'));
                     } catch (e) {
+                        console.error('Player God Mode error: ' + e.message);
                         showMessage('Player God Mode error: ' + e.message);
                     }
                 });
@@ -493,9 +604,20 @@ VehicleIV.init = function() {
                 console.error('Failed to create Player God Mode checkbox or label: ' + e.message);
             }
 
+            // Vehicle Spawn Protection checkbox
+            try {
+                var spawnProtectionCheckbox = window.checkBox(10, 270, 20, 20, '', {}, function() {
+                    spawnProtectionEnabled = this.checked;
+                    showMessage('Vehicle Spawn Protection ' + (spawnProtectionEnabled ? 'enabled' : 'disabled'));
+                });
+                window.text(40, 270, 150, 20, 'Vehicle Spawn Protection', {});
+            } catch (e) {
+                console.error('Failed to create Vehicle Spawn Protection checkbox or label: ' + e.message);
+            }
+
             // Teleport to Waypoint button
             try {
-                var teleportButton = window.button(10, 270, 120, 25, 'Teleport to Waypoint', {}, function() {
+                var teleportButton = window.button(10, 300, 185, 25, 'Teleport to Waypoint', {}, function() {
                     try {
                         var blipId = natives.getFirstBlipInfoId(8); // 8 is waypoint blip type
                         if (blipId) {
@@ -515,6 +637,7 @@ VehicleIV.init = function() {
                             showMessage('No waypoint set');
                         }
                     } catch (e) {
+                        console.error('Teleport error: ' + e.message);
                         showMessage('Teleport error: ' + e.message);
                     }
                 });
@@ -524,7 +647,7 @@ VehicleIV.init = function() {
 
             // Footer text
             try {
-                window.text(10, 300, 380, 20, 'Developed by SirCryptic aka WizzWow :)', { align: 'center', textColour: toColour(255, 255, 255, 255) });
+                window.text(10, 335, 380, 20, 'Developed by SirCryptic aka WizzWow :)', { align: 'center', textColour: toColour(255, 255, 255, 255) });
             } catch (e) {
                 console.error('Failed to create footer text: ' + e.message);
             }
@@ -571,7 +694,7 @@ VehicleIV.init = function() {
                     console.error('Vehicle God Mode check error: ' + e.message);
                 }
             }
-        }, 500); // Check every 500ms
+        }, 100); // Check every 100ms
 
         // Check Free Mode
         var gameMode = 'unknown';
