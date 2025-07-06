@@ -1,5 +1,5 @@
 # VehicleIV
-Public client side Vehicle Spawner for gta connected servers (IV) using mexui check the readme in the VehicleIV folder
+VehicleIV aka VIV is a Public client side Vehicle Spawner for gta connected servers (IV) using mexui check the readme in the VehicleIV folder
 
 ![image](https://github.com/user-attachments/assets/3f3c39d4-2f6c-4e74-86a5-7cc1c396e477)
 
