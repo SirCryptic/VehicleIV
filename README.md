@@ -1,21 +1,26 @@
-# VehicleIV
-VehicleIV aka VIV is a Public client side Vehicle Spawner for gta connected servers (IV) using mexui check the readme in the VehicleIV folder
+# VehicleIV (Archived)  
+VehicleIV (VIV) is a public client-side vehicle spawner for GTA Connected (IV), built using **mexui**. See the README inside the VehicleIV folder for setup details.  
 
 ![image](https://github.com/user-attachments/assets/3f3c39d4-2f6c-4e74-86a5-7cc1c396e477)
 
+---
 
-## Notes:
-- The Vehicle Spawner Menu is disabled on all game modes other than freemode to maintain balance with in lobbys .
-- WEAPONS ARE DISABLED WHEN ENABLING GODMODE TO COUNTERACT SOME FORM OF GRIEFING.
+## Notes
+- The Vehicle Spawner Menu only works in **freemode** (disabled in other modes to maintain balance).  
+- **Weapons are disabled in Godmode** to reduce griefing.  
 
+---
 
-# Disclaimer
-<details>
-  <summary>Click to expand!</summary>
-  
+## Status  
+📢 **Announcement – Project Archived**  
 
-Everyone/Company That is viewing this Content This Aplies To You.
+Development on VehicleIV and GTA Connected-related content has officially ended.  
+No further updates, fixes, or support will be provided.  
 
-Copyright Disclaimer Under Section 107 of the Copyright Act 1976,allowance is made for "fair use" for purposes such as criticism,comment,news reporting,teaching,scholarship and research. Fair use is a use permitted by Copyright statue that might otherwise be infringing. Non-profit, educational or personal use tips the balance in favor of fair use.
-</details>
-  
+Please note:  
+- This release is **the only public version** of VehicleIV that will ever be available.  
+- You may not see the same features shown on my personal server or in videos created by others.  
+
+This repository remains public for archival and reference purposes only.  
+
+— **SirCryptic**  
